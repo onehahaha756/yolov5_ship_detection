@@ -52,11 +52,11 @@ class Detect(nn.Module):
             x[i] = self.m[i](x[i])  # conv
             bs, _, ny, nx = x[i].shape  # x(bs,255,20,20) to x(bs,3,20,20,85)
             x[i] = x[i].view(bs, self.na, self.no, ny, nx).permute(0, 1, 3, 4, 2).contiguous()
-
+            # import pdb;pdb.set_trace()
             if not self.training:  # inference
                 if self.grid[i].shape[2:4] != x[i].shape[2:4] or self.onnx_dynamic:
                     self.grid[i] = self._make_grid(nx, ny).to(x[i].device)
-
+                # import pdb;pdb.set_trace()
                 y = x[i].sigmoid()
                 if self.inplace:
                     y[..., 0:2] = (y[..., 0:2] * 2. - 0.5 + self.grid[i]) * self.stride[i]  # xy
@@ -87,6 +87,7 @@ class Model(nn.Module):
                 self.yaml = yaml.safe_load(f)  # model dict
 
         # Define model
+        # import pdb;pdb.set_trace()
         ch = self.yaml['ch'] = self.yaml.get('ch', ch)  # input channels
         if nc and nc != self.yaml['nc']:
             logger.info(f"Overriding model.yaml nc={self.yaml['nc']} with nc={nc}")
@@ -117,6 +118,7 @@ class Model(nn.Module):
         logger.info('')
 
     def forward(self, x, augment=False, profile=False):
+        # import pdb;pdb.set_trace()
         if augment:
             return self.forward_augment(x)  # augmented inference, None
         else:
@@ -127,6 +129,7 @@ class Model(nn.Module):
         s = [1, 0.83, 0.67]  # scales
         f = [None, 3, None]  # flips (2-ud, 3-lr)
         y = []  # outputs
+        # import pdb;pdb.set_trace()
         for si, fi in zip(s, f):
             xi = scale_img(x.flip(fi) if fi else x, si, gs=int(self.stride.max()))
             yi = self.forward_once(xi)[0]  # forward
@@ -156,6 +159,7 @@ class Model(nn.Module):
 
         if profile:
             logger.info('%.1fms total' % sum(dt))
+        # import pdb;pdb.set_trace()
         return x
 
     def _descale_pred(self, p, flips, scale, img_size):

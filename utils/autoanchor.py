@@ -5,7 +5,10 @@ import torch
 import yaml
 from tqdm import tqdm
 
-from utils.general import colorstr
+try:
+    from utils.general import colorstr
+except:
+    from general import colorstr
 
 
 def check_anchor_order(m):
@@ -104,7 +107,10 @@ def kmean_anchors(path='./data/coco128.yaml', n=9, img_size=640, thr=4.0, gen=10
     if isinstance(path, str):  # *.yaml file
         with open(path) as f:
             data_dict = yaml.safe_load(f)  # model dict
-        from utils.datasets import LoadImagesAndLabels
+        try:
+            from utils.datasets import LoadImagesAndLabels
+        except:
+            from datasets import LoadImagesAndLabels
         dataset = LoadImagesAndLabels(data_dict['train'], augment=True, rect=True)
     else:
         dataset = path  # dataset
@@ -159,3 +165,5 @@ def kmean_anchors(path='./data/coco128.yaml', n=9, img_size=640, thr=4.0, gen=10
                 print_results(k)
 
     return print_results(k)
+# data_path='../data/seaship.yaml'
+# kmean_anchors(path=data_path)
