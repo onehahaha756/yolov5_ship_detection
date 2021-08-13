@@ -241,8 +241,11 @@ def casia_eval(annot_dir,annot_type,det_path,imglist,classname,conf_thre=0.3,ovt
             cls_gtbboxs:[[(x1,y1,x2,y2),detflag],...]
             '''
             imgname=imageids[d]
-            #import pdb;pdb.set_trace()
-            cls_gtbboxs=cls_gt[imgname]
+            # import pdb;pdb.set_trace()
+            try:
+                cls_gtbboxs=cls_gt[imgname]
+            except:
+                continue
             #image has no object, so the bbox is false positive
             if len(cls_gtbboxs)==0:
                 fp[d]=1
@@ -286,6 +289,7 @@ def casia_eval(annot_dir,annot_type,det_path,imglist,classname,conf_thre=0.3,ovt
   
         #import pdb;pdb.set_trace()
         print('*'*15)
+        print('total labels: ',GtNmus)
         #print('save path : {} ')
         #print('weights path :{}\n'.format(args.trained_model))
         print('iou overthre:{}\nConfidence thre:{}\nAP:{}\nMaxRecall:{} \nMinPrecision: {}'\

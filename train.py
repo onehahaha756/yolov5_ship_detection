@@ -37,6 +37,23 @@ from utils.torch_utils import ModelEMA, select_device, intersect_dicts, torch_di
 from utils.wandb_logging.wandb_utils import WandbLogger, check_wandb_resume
 
 logger = logging.getLogger(__name__)
+def setup_seed(seed):
+    print('setup seed...',seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    torch.manual_seed(seed)
+    # torch.cuda.manual_seed_all(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = True
+GLOBAL_SEED = 1
+GLOBAL_WORKER_ID = None
+
+def worker_init_fn(worker_id):
+    global GLOBAL_WORKER_ID
+    GLOBAL_WORKER_ID = worker_id
+    setup_seed(GLOBAL_SEED + worker_id)
 
 def train(hyp, opt, device, tb_writer=None):
     logger.info(colorstr('hyperparameters: ') + ', '.join(f'{k}={v}' for k, v in hyp.items()))
@@ -44,14 +61,14 @@ def train(hyp, opt, device, tb_writer=None):
         Path(opt.save_dir), opt.epochs, opt.batch_size, opt.total_batch_size, opt.weights, opt.global_rank, \
         opt.single_cls
     # import pdb;pdb.set_trace()
-    shutil.copy(opt.data,save_dir)
+    # shutil.copy(opt.data,save_dir)
     # Directories
     wdir = save_dir / 'weights'
     wdir.mkdir(parents=True, exist_ok=True)  # make dir
     last = wdir / 'last.pt'
     best = wdir / 'best.pt'
     results_file = save_dir / 'results.txt'
-
+    shutil.copy(opt.data,save_dir)
     # Save run settings
     with open(save_dir / 'hyp.yaml', 'w') as f:
         yaml.safe_dump(hyp, f, sort_keys=False)
@@ -61,7 +78,8 @@ def train(hyp, opt, device, tb_writer=None):
     # Configure
     plots = not opt.evolve  # create plots
     cuda = device.type != 'cpu'
-    init_seeds(2 + rank)
+    # init_seeds(2 + rank)
+    # print('rank',rank)
     with open(opt.data) as f:
         data_dict = yaml.safe_load(f)  # data dict
 
@@ -101,8 +119,11 @@ def train(hyp, opt, device, tb_writer=None):
     test_path = data_dict['val']
 
     # Freeze
-    freeze = []  # parameter names to freeze (full or partial)
+    # import pdb;pdb.set_trace()
+    # freeze = ['model.%s.' % x for x in range(10)]   # parameter names to freeze (full or partial)
+    freeze=[]
     for k, v in model.named_parameters():
+        # import pdb;pdb.set_trace()
         v.requires_grad = True  # train all layers
         if any(x in k for x in freeze):
             print('freezing %s' % k)
@@ -414,6 +435,7 @@ def train(hyp, opt, device, tb_writer=None):
                     break
         # end epoch ----------------------------------------------------------------------------------------------------
     # end training
+    
     if rank in [-1, 0]:
         logger.info(f'{epoch - start_epoch + 1} epochs completed in {(time.time() - t0) / 3600:.3f} hours.\n')
         if plots:
@@ -450,6 +472,7 @@ def train(hyp, opt, device, tb_writer=None):
     else:
         dist.destroy_process_group()
     torch.cuda.empty_cache()
+    print('best epoch : ',best_epoch)
     return results
 
 
@@ -480,6 +503,7 @@ if __name__ == '__main__':
     parser.add_argument('--workers', type=int, default=4, help='maximum number of dataloader workers')
     parser.add_argument('--project', default='runs/train', help='save to project/name')
     parser.add_argument('--entity', default=None, help='W&B entity')
+    parser.add_argument('--seed', type=int, default=0, help='seed')  
     parser.add_argument('--name', default='exp', help='save to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--quad', action='store_true', help='quad dataloader')
@@ -490,6 +514,8 @@ if __name__ == '__main__':
     parser.add_argument('--save_period', type=int, default=-1, help='Log model after every "save_period" epoch')
     parser.add_argument('--artifact_alias', type=str, default="latest", help='version of dataset artifact to be used')
     opt = parser.parse_args()
+    
+    setup_seed(opt.seed)
 
     # Set DDP variables
     opt.world_size = int(os.environ['WORLD_SIZE']) if 'WORLD_SIZE' in os.environ else 1
